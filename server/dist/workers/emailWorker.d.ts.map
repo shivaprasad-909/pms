@@ -1,0 +1,1 @@
+{"version":3,"file":"emailWorker.d.ts","sourceRoot":"","sources":["../../src/workers/emailWorker.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,KAAK,EAAe,MAAM,QAAQ,CAAC;AAG5C,eAAO,MAAM,cAAc,gBAAgB,CAAC;AAE5C,eAAO,MAAM,UAAU,2CAEf,CAAC;AAET,eAAO,MAAM,YAAY,GAAU,IAAI,MAAM,EAAE,SAAS,MAAM,EAAE,MAAM,MAAM,kBAM3E,CAAC;AAGF,eAAO,MAAM,gBAAgB,YAoB5B,CAAC"}

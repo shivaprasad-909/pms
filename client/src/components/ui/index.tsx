@@ -160,7 +160,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: { key: string; label: s
           padding: '10px 20px', fontSize: 13, fontWeight: active === t.key ? 600 : 400, cursor: 'pointer',
           color: active === t.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
           borderBottom: active === t.key ? '2px solid var(--color-primary)' : '2px solid transparent',
-          background: 'none', border: 'none', marginBottom: -2, transition: 'all 0.15s ease',
+          background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', marginBottom: -2, transition: 'all 0.15s ease',
         }}>{t.label}</button>
       ))}
     </div>

@@ -20,6 +20,7 @@ interface RegisterInput {
   phone?: string;
   designation?: string;
   department?: string;
+  uiPermissions?: string[];
   organizationId: string;
 }
 
@@ -28,13 +29,29 @@ interface JwtPayload {
   email: string;
   role: Role;
   organizationId: string;
+  permissions: string[];
 }
+
+export const DEFAULT_PERMISSIONS: Record<Role, string[]> = {
+  FOUNDER: ['*'],
+  ADMIN: ['*'],
+  MANAGER: ['dashboard.view', 'projects.view', 'projects.create', 'tasks.view', 'tasks.update', 'analytics.view', 'reports.view', 'chat.access', 'teams.manage'],
+  DEVELOPER: ['dashboard.view', 'projects.view', 'tasks.view', 'tasks.update', 'chat.access'],
+  STAKEHOLDER: ['dashboard.view', 'projects.view', 'reports.view']
+};
+
+const getMergedPermissions = (role: Role, uiPermissions: string[]) => {
+  if (role === 'FOUNDER' || role === 'ADMIN') return ['*'];
+  const defaults = DEFAULT_PERMISSIONS[role] || [];
+  const merged = new Set([...defaults, ...(uiPermissions || [])]);
+  return Array.from(merged);
+};
 
 const USER_SELECT = {
   id: true, email: true, firstName: true, lastName: true,
   role: true, avatar: true, phone: true, designation: true,
   department: true, isActive: true, organizationId: true,
-  weeklyCapacity: true, createdAt: true, lastLoginAt: true,
+  uiPermissions: true, weeklyCapacity: true, createdAt: true, lastLoginAt: true,
 };
 
 export const registerUser = async (input: RegisterInput) => {
@@ -52,6 +69,7 @@ export const registerUser = async (input: RegisterInput) => {
       phone: input.phone,
       designation: input.designation,
       department: input.department,
+      uiPermissions: input.uiPermissions || [],
       organizationId: input.organizationId,
     },
     select: USER_SELECT,
@@ -71,9 +89,12 @@ export const loginUser = async (email: string, password: string) => {
   const valid = await comparePassword(password, user.password);
   if (!valid) throw new UnauthorizedError('Invalid email or password');
 
+  const permissions = getMergedPermissions(user.role, user.uiPermissions);
+
   const payload: JwtPayload = {
     userId: user.id, email: user.email,
     role: user.role, organizationId: user.organizationId,
+    permissions,
   };
 
   const accessToken = generateAccessToken(payload);
@@ -85,7 +106,7 @@ export const loginUser = async (email: string, password: string) => {
   });
 
   const { password: _, refreshToken: __, ...userData } = user;
-  return { user: userData, accessToken, refreshToken };
+  return { user: { ...userData, permissions }, accessToken, refreshToken };
 };
 
 export const refreshAccessToken = async (token: string) => {
@@ -95,9 +116,12 @@ export const refreshAccessToken = async (token: string) => {
   if (!user || user.refreshToken !== token) throw new UnauthorizedError('Invalid refresh token');
   if (!user.isActive) throw new UnauthorizedError('Account is deactivated');
 
+  const permissions = getMergedPermissions(user.role, user.uiPermissions);
+
   const payload: JwtPayload = {
     userId: user.id, email: user.email,
     role: user.role, organizationId: user.organizationId,
+    permissions,
   };
 
   const accessToken = generateAccessToken(payload);
@@ -155,11 +179,14 @@ export const setupOrganization = async (
     return { organization: org, founder };
   });
 
+  const permissions = getMergedPermissions(result.founder.role, []);
+  
   const payload: JwtPayload = {
     userId: result.founder.id,
     email: result.founder.email,
     role: result.founder.role,
     organizationId: result.founder.organizationId,
+    permissions,
   };
 
   const accessToken = generateAccessToken(payload);
@@ -170,7 +197,7 @@ export const setupOrganization = async (
     data: { refreshToken, lastLoginAt: new Date() },
   });
 
-  return { organization: result.organization, user: result.founder, accessToken, refreshToken };
+  return { organization: result.organization, user: { ...result.founder, permissions }, accessToken, refreshToken };
 };
 
 export const getCurrentUser = async (userId: string) => {
@@ -179,7 +206,8 @@ export const getCurrentUser = async (userId: string) => {
     select: { ...USER_SELECT, organization: { select: { id: true, name: true, slug: true, logo: true } } },
   });
   if (!user) throw new NotFoundError('User');
-  return user;
+  const permissions = getMergedPermissions(user.role, user.uiPermissions);
+  return { ...user, permissions };
 };
 
 export const forgotPassword = async (email: string) => {

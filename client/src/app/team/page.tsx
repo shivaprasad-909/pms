@@ -21,7 +21,7 @@ const roleGradients: Record<string, string> = {
 // ── Invite Modal ─────────────────
 
 function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'DEVELOPER', designation: '' });
+  const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'DEVELOPER', designation: '', uiPermissions: [] as string[] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,9 +33,23 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       await api.post('/auth/register', form);
       onCreated();
       onClose();
-    } catch (err: any) { setError(err.response?.data?.message || 'Failed'); }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      const data = err.response?.data;
+      if (data?.errors && data.errors.length > 0) {
+        setError(data.errors[0].message);
+      } else {
+        setError(data?.message || 'Failed');
+      }
+    } finally { setLoading(false); }
   };
+
+  const availablePermissions = [
+    { id: 'analytics.view', label: 'View Analytics' },
+    { id: 'reports.view', label: 'View Reports' },
+    { id: 'teams.manage', label: 'Manage Teams' },
+    { id: 'automation.manage', label: 'Manage Automations' },
+    { id: 'projects.create', label: 'Create Projects' }
+  ];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -58,10 +72,30 @@ function InviteModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               <select className="select" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
                 <option value="DEVELOPER">Developer</option>
                 <option value="MANAGER">Manager</option>
+                <option value="STAKEHOLDER">Stakeholder</option>
                 <option value="ADMIN">Admin</option>
               </select>
             </div>
             <div><label className="input-label">Designation</label><input className="input" value={form.designation} onChange={e => setForm({ ...form, designation: e.target.value })} placeholder="e.g. Senior Developer" /></div>
+          </div>
+          
+          <div style={{ marginTop: 8 }}>
+            <label className="input-label">Extra UI Permissions (Overrides)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4, background: 'var(--color-bg-secondary)', padding: 12, borderRadius: 'var(--radius-md)' }}>
+              {availablePermissions.map(p => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={form.uiPermissions.includes(p.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setForm({ ...form, uiPermissions: [...form.uiPermissions, p.id] });
+                      else setForm({ ...form, uiPermissions: form.uiPermissions.filter(id => id !== p.id) });
+                    }}
+                  />
+                  {p.label}
+                </label>
+              ))}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>

@@ -24,6 +24,7 @@ enum Role {
   ADMIN
   MANAGER
   DEVELOPER
+  STAKEHOLDER
 }
 
 enum ProjectStatus {
@@ -190,6 +191,8 @@ model Organization {
   teams         Team[]
   webhooks      Webhook[]
   dashboards    Dashboard[]
+  tags          Tag[]
+  calendarEvents CalendarEvent[]
 
   @@map("organizations")
 }
@@ -203,6 +206,7 @@ model User {
   lastName       String
   avatar         String?
   role           Role      @default(DEVELOPER)
+  uiPermissions  String[]  @default([])
   isActive       Boolean   @default(true)
   phone          String?
   designation    String?
@@ -240,6 +244,7 @@ model User {
   teamMemberships    TeamMember[]
   notificationSetting NotificationSetting?
   passwordResetTokens PasswordResetToken[]
+  calendarEvents      CalendarEvent[]
 
   @@map("users")
 }
@@ -282,6 +287,8 @@ model Project {
   channels       ChatChannel[]
   savedViews     SavedView[]
   stakeholders   Stakeholder[]
+  customFields   CustomField[]
+  calendarEvents CalendarEvent[]
 
   @@map("projects")
 }
@@ -338,6 +345,8 @@ model Task {
   dependencies TaskDependency[] @relation("DependentTask")
   dependents   TaskDependency[] @relation("DependencyTask")
   subtasks     Subtask[]
+  taskTags     TaskTag[]
+  customFields CustomFieldValue[]
 
   @@index([projectId, status])
   @@index([sprintId])
@@ -988,4 +997,105 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+}
+
+// ============================================
+// TAGS
+// ============================================
+
+model Tag {
+  id             String   @id @default(uuid())
+  name           String
+  color          String   @default("#3B82F6")
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taskTags     TaskTag[]
+
+  @@map("tags")
+}
+
+model TaskTag {
+  id     String @id @default(uuid())
+  taskId String
+  tagId  String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, tagId])
+  @@map("task_tags")
+}
+
+// ============================================
+// CUSTOM FIELDS
+// ============================================
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  DROPDOWN
+  CHECKBOX
+}
+
+model CustomField {
+  id        String          @id @default(uuid())
+  name      String
+  type      CustomFieldType
+  options   Json?           // For DROPDOWN type
+
+  projectId String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  values  CustomFieldValue[]
+
+  @@map("custom_fields")
+}
+
+model CustomFieldValue {
+  id            String @id @default(uuid())
+  value         String // Stringified value based on type
+  
+  customFieldId String
+  taskId        String
+
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, taskId])
+  @@map("custom_field_values")
+}
+
+// ============================================
+// CALENDAR EVENTS
+// ============================================
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  isAllDay    Boolean  @default(false)
+  location    String?
+
+  userId         String
+  projectId      String?
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_events")
 }

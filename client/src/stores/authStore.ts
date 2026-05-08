@@ -27,6 +27,7 @@ interface AuthState {
   isManager: () => boolean;
   isDeveloper: () => boolean;
   hasRole: (...roles: Role[]) => boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -101,6 +102,21 @@ export const useAuthStore = create<AuthState>()(
       hasRole: (...roles) => {
         const userRole = get().user?.role;
         return userRole ? roles.includes(userRole) : false;
+      },
+      hasPermission: (permission: string) => {
+        const user = get().user as any;
+        if (!user) return false;
+        if (user.role === 'FOUNDER' || user.role === 'ADMIN') return true; // Admins override
+        
+        // Hardcoded defaults just in case the backend hasn't updated/restarted yet
+        const defaultRolePerms: Record<string, string[]> = {
+          MANAGER: ['dashboard.view', 'projects.view', 'projects.create', 'tasks.view', 'tasks.update', 'analytics.view', 'reports.view', 'chat.access', 'teams.manage'],
+          DEVELOPER: ['dashboard.view', 'projects.view', 'tasks.view', 'tasks.update', 'chat.access'],
+          STAKEHOLDER: ['dashboard.view', 'projects.view', 'reports.view']
+        };
+
+        const perms = user.permissions || [ ...(defaultRolePerms[user.role] || []), ...(user.uiPermissions || []) ];
+        return Array.isArray(perms) && (perms.includes('*') || perms.includes(permission));
       },
     }),
     {

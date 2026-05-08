@@ -190,14 +190,38 @@ export const addProjectMember = async (projectId: string, userId: string, member
   });
   if (existing) throw new Error('User is already a member');
 
-  return prisma.projectMember.create({
-    data: { userId, projectId, role: memberRole },
-    include: { user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } } },
+  return prisma.$transaction(async (tx) => {
+    const member = await tx.projectMember.create({
+      data: { userId, projectId, role: memberRole },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } } },
+    });
+
+    // Auto-add to project group chat
+    const channel = await tx.chatChannel.findFirst({ where: { projectId, type: 'PROJECT' } });
+    if (channel) {
+      await tx.channelMember.upsert({
+        where: { channelId_userId: { channelId: channel.id, userId } },
+        create: { channelId: channel.id, userId },
+        update: {},
+      });
+    }
+
+    return member;
   });
 };
 
 export const removeProjectMember = async (projectId: string, userId: string) => {
-  await prisma.projectMember.delete({ where: { userId_projectId: { userId, projectId } } });
+  await prisma.$transaction(async (tx) => {
+    await tx.projectMember.delete({ where: { userId_projectId: { userId, projectId } } });
+    
+    // Auto-remove from project group chat
+    const channel = await tx.chatChannel.findFirst({ where: { projectId, type: 'PROJECT' } });
+    if (channel) {
+      await tx.channelMember.deleteMany({
+        where: { channelId: channel.id, userId }
+      });
+    }
+  });
   return { message: 'Member removed' };
 };
 

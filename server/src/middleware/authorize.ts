@@ -79,3 +79,28 @@ export const managerOrAbove = authorize(
   'ADMIN' as Role, 
   'MANAGER' as Role
 );
+
+/**
+ * Middleware: Require Specific Granular Permission
+ * Checks if the user's JWT payload includes the requested permission string.
+ * Users with '*' permission bypass this check.
+ */
+export const requirePermission = (requiredPermission: string) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Authentication required.' });
+      return;
+    }
+
+    const perms = req.user.permissions || [];
+    if (!perms.includes('*') && !perms.includes(requiredPermission)) {
+      res.status(403).json({
+        success: false,
+        message: `Access denied. Missing permission: ${requiredPermission}.`,
+      });
+      return;
+    }
+
+    next();
+  };
+};

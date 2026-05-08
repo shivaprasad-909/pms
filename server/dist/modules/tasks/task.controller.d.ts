@@ -1,0 +1,25 @@
+import { Request, Response } from 'express';
+export declare const create: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getAll: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getById: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const update: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const remove: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const assign: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const unassign: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const addComment: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const reorder: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const addDependency: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getStats: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const updateSubtask: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listComments: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const updateComment: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const deleteComment: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listDependencies: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const removeDependency: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listSubtasks: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const createSubtask: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const deleteSubtask: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listTimeLogs: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const createTimeLog: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listAttachments: (req: Request, res: Response, next: import("express").NextFunction) => void;
+//# sourceMappingURL=task.controller.d.ts.map

@@ -1,0 +1,89 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const asyncHandler_1 = require("../../utils/asyncHandler");
+const apiResponse_1 = require("../../utils/apiResponse");
+const params_1 = require("../../utils/params");
+const sprintService = __importStar(require("./sprint.service"));
+const auth_1 = require("../../middleware/auth");
+const authorize_1 = require("../../middleware/authorize");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/', (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.getSprints(req.query);
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+router.post('/', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.createSprint(req.body);
+    (0, apiResponse_1.sendResponse)({ res, statusCode: 201, data: result });
+}));
+router.get('/:sprintId', (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.getSprintById((0, params_1.p)(req.params.sprintId));
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+router.patch('/:sprintId', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.updateSprint((0, params_1.p)(req.params.sprintId), req.body);
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+router.delete('/:sprintId', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.deleteSprint((0, params_1.p)(req.params.sprintId));
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+router.post('/:sprintId/tasks', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.addTasksToSprint((0, params_1.p)(req.params.sprintId), req.body.taskIds);
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+router.delete('/:sprintId/tasks/:taskId', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.removeTaskFromSprint((0, params_1.p)(req.params.sprintId), (0, params_1.p)(req.params.taskId));
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+// Burndown
+router.get('/:sprintId/burndown', (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.getSprintBurndown((0, params_1.p)(req.params.sprintId));
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+// Velocity
+router.get('/:sprintId/velocity', (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.getSprintVelocity((0, params_1.p)(req.params.sprintId));
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+// Swap sprint (move tasks between sprints)
+router.post('/:sprintId/swap', authorize_1.managerOrAbove, (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+    const result = await sprintService.swapSprint((0, params_1.p)(req.params.sprintId), req.body.targetSprintId);
+    (0, apiResponse_1.sendResponse)({ res, data: result });
+}));
+exports.default = router;
+//# sourceMappingURL=sprint.routes.js.map

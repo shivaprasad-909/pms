@@ -45,6 +45,11 @@ import dashboardRoutes from './modules/dashboards/dashboard.routes';
 import notificationSettingsRoutes from './modules/notification-settings/notificationSettings.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import boardRoutes from './modules/boards/board.routes';
+import tagRoutes from './modules/tags/tag.routes';
+import customFieldRoutes from './modules/custom-fields/customField.routes';
+import calendarRoutes from './modules/calendar/calendar.routes';
+import uploadRoutes from './modules/uploads/upload.routes';
+import systemRoutes from './modules/system/system.routes';
 import path from 'path';
 
 // ============================================
@@ -184,6 +189,15 @@ app.use('/api/automation', automationRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/approvals', approvalRoutes);
+
+// Missing requested APIs
+app.use('/api/tags', tagRoutes);
+app.use('/api/custom-fields', customFieldRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/uploads', uploadRoutes);
+
+// System APIs
+app.use('/api', systemRoutes); // Mounts /api/status, /api/metrics, /api/queues/status
 
 // Static file serving for uploads
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

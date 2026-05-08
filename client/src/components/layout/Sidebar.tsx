@@ -17,27 +17,27 @@ import {
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-  const { user, logout, hasRole } = useAuthStore();
+  const { user, logout, hasPermission } = useAuthStore();
 
-  // Navigation items based on role
+  // Navigation items based on permission
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/workspaces', label: 'Workspaces', icon: LayoutDashboard, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/projects', label: 'Projects', icon: FolderKanban, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/sprints', label: 'Sprints', icon: Target, roles: ['FOUNDER', 'ADMIN', 'MANAGER'] as const },
-    { href: '/time-tracking', label: 'Time Tracking', icon: Clock, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/team', label: 'Team', icon: Users, roles: ['FOUNDER', 'ADMIN'] as const },
-    { href: '/messages', label: 'Messages', icon: MessageSquare, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/activity', label: 'Activity Log', icon: Activity, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/reports', label: 'Reports', icon: BarChart3, roles: ['FOUNDER', 'ADMIN', 'MANAGER'] as const },
-    { href: '/calendar', label: 'Calendar', icon: Calendar, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/documents', label: 'Documents', icon: FileText, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
-    { href: '/automation', label: 'Automation', icon: Zap, roles: ['FOUNDER', 'ADMIN'] as const },
-    { href: '/settings', label: 'Settings', icon: Settings, roles: ['FOUNDER', 'ADMIN', 'MANAGER', 'DEVELOPER'] as const },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
+    { href: '/workspaces', label: 'Workspaces', icon: LayoutDashboard, permission: 'dashboard.view' },
+    { href: '/projects', label: 'Projects', icon: FolderKanban, permission: 'projects.view' },
+    { href: '/tasks', label: 'My Tasks', icon: CheckSquare, permission: 'tasks.view' },
+    { href: '/sprints', label: 'Sprints', icon: Target, permission: 'tasks.view' },
+    { href: '/time-tracking', label: 'Time Tracking', icon: Clock, permission: 'tasks.view' },
+    { href: '/team', label: 'Team', icon: Users, permission: 'teams.manage' },
+    { href: '/messages', label: 'Messages', icon: MessageSquare, permission: 'chat.access' },
+    { href: '/activity', label: 'Activity Log', icon: Activity, permission: 'dashboard.view' },
+    { href: '/reports', label: 'Reports', icon: BarChart3, permission: 'reports.view' },
+    { href: '/calendar', label: 'Calendar', icon: Calendar, permission: 'tasks.view' },
+    { href: '/documents', label: 'Documents', icon: FileText, permission: 'dashboard.view' },
+    { href: '/automation', label: 'Automation', icon: Zap, permission: 'automation.manage' },
+    { href: '/settings', label: 'Settings', icon: Settings, permission: 'settings.manage' },
   ];
 
-  const filteredNav = navItems.filter(item => hasRole(...item.roles));
+  const filteredNav = navItems.filter(item => hasPermission(item.permission));
 
   // Get user initials for avatar
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : '??';
@@ -47,6 +47,7 @@ export default function Sidebar() {
     FOUNDER: 'linear-gradient(135deg, #6C5CE7, #A29BFE)',
     ADMIN: 'linear-gradient(135deg, #0984E3, #74B9FF)',
     MANAGER: 'linear-gradient(135deg, #00B894, #55EFC4)',
+    STAKEHOLDER: 'linear-gradient(135deg, #E84393, #FD79A8)',
     DEVELOPER: 'linear-gradient(135deg, #F39C12, #F8C471)',
   };
 

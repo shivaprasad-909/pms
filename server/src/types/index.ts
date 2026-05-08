@@ -22,6 +22,7 @@ export interface JwtPayload {
   email: string;          // User's email address
   role: Role;             // User's role (FOUNDER, ADMIN, etc.)
   organizationId: string; // User's organization
+  permissions: string[];  // Granular UI and API access strings
 }
 
 /**
