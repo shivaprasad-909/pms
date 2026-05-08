@@ -1,0 +1,991 @@
+// ============================================
+// PMS Database Schema — Prisma ORM
+// ============================================
+// Enterprise-grade Project Management System
+// Inspired by Jira, Asana, ClickUp, Monday.com,
+// Linear, Notion, and Microsoft Project.
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  FOUNDER
+  ADMIN
+  MANAGER
+  DEVELOPER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  PENDING_APPROVAL
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SprintStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+}
+
+enum ActivityAction {
+  CREATED
+  UPDATED
+  DELETED
+  ASSIGNED
+  UNASSIGNED
+  STATUS_CHANGED
+  COMMENTED
+  UPLOADED
+  APPROVED
+  REJECTED
+  LOGGED_TIME
+  SUBMITTED_REVIEW
+  COMPLETED
+  PERMISSION_CHANGED
+  INVITED
+  MOVED
+}
+
+enum EntityType {
+  USER
+  PROJECT
+  TASK
+  SPRINT
+  COMMENT
+  DOCUMENT
+  ATTACHMENT
+  TIME_LOG
+  AUTOMATION
+  CHANNEL
+  MESSAGE
+  BOARD
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_COMPLETED
+  TASK_REVIEW
+  TASK_APPROVED
+  TASK_REJECTED
+  TASK_OVERDUE
+  PROJECT_CREATED
+  PROJECT_COMPLETED
+  PROJECT_APPROVAL
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  COMMENT_ADDED
+  MENTION
+  SYSTEM
+  MESSAGE
+  AUTOMATION
+}
+
+enum AutomationTrigger {
+  TASK_STATUS_CHANGE
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_OVERDUE
+  PROJECT_COMPLETED
+  SPRINT_COMPLETED
+  DUE_DATE_APPROACHING
+  TIME_LOGGED
+}
+
+enum AutomationActionType {
+  SEND_NOTIFICATION
+  CHANGE_STATUS
+  ASSIGN_USER
+  SEND_EMAIL
+  CREATE_TASK
+  UPDATE_PRIORITY
+  REQUEST_APPROVAL
+  SEND_REMINDER
+}
+
+enum ChannelType {
+  PROJECT
+  TEAM
+  DIRECT
+  GENERAL
+}
+
+enum ViewType {
+  LIST
+  BOARD
+  CALENDAR
+  GANTT
+  TIMELINE
+}
+
+enum DocBlockType {
+  PARAGRAPH
+  HEADING_1
+  HEADING_2
+  HEADING_3
+  BULLETED_LIST
+  NUMBERED_LIST
+  TODO_LIST
+  CODE
+  QUOTE
+  CALLOUT
+  DIVIDER
+  IMAGE
+  TABLE
+  EMBED
+}
+
+// ============================================
+// CORE MODELS
+// ============================================
+
+/// Organization — top-level tenant
+model Organization {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  logo        String?
+  website     String?
+  timezone    String   @default("UTC")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  projects      Project[]
+  channels      ChatChannel[]
+  automations   AutomationRule[]
+  activityLogs  ActivityLog[]
+  workspaces    Workspace[]
+  teams         Team[]
+  webhooks      Webhook[]
+  dashboards    Dashboard[]
+
+  @@map("organizations")
+}
+
+/// User — system member with role-based access
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  firstName      String
+  lastName       String
+  avatar         String?
+  role           Role      @default(DEVELOPER)
+  isActive       Boolean   @default(true)
+  phone          String?
+  designation    String?
+  department     String?
+  weeklyCapacity Float     @default(40) // hours per week
+
+  organizationId String
+  refreshToken   String?
+  lastLoginAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  managedProjects  ProjectMember[]  @relation("MemberUser")
+  taskAssignments  TaskAssignment[]
+  comments         TaskComment[]
+  timeLogs         TimeLog[]
+  activityLogs     ActivityLog[]
+  notifications    Notification[]
+  createdProjects  Project[]        @relation("ProjectCreator")
+  attachments      TaskAttachment[]
+
+  // Chat
+  channelMemberships ChannelMember[]
+  channelMessages    ChannelMessage[]
+
+  // Documents
+  documentPages DocumentPage[]
+
+  // Saved views
+  savedViews SavedView[]
+
+  // New relations
+  teamMemberships    TeamMember[]
+  notificationSetting NotificationSetting?
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+// ============================================
+// PROJECT MODELS
+// ============================================
+
+model Project {
+  id            String        @id @default(uuid())
+  name          String
+  slug          String        @unique
+  workspaceId   String?
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  priority    Priority      @default(MEDIUM)
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  budget      Float?
+  progress    Float         @default(0) // 0-100 calculated
+
+  organizationId String
+  createdById    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("ProjectCreator", fields: [createdById], references: [id])
+  workspace    Workspace?   @relation("WorkspaceProjects", fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  members        ProjectMember[]
+  tasks          Task[]
+  sprints        Sprint[]
+  activityLogs   ActivityLog[]
+  documents      DocumentPage[]
+  automationRules AutomationRule[]
+  boards         Board[]
+  channels       ChatChannel[]
+  savedViews     SavedView[]
+  stakeholders   Stakeholder[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  userId    String
+  projectId String
+  role      Role
+
+  joinedAt DateTime @default(now())
+
+  user    User    @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+// ============================================
+// TASK MODELS
+// ============================================
+
+model Task {
+  id             String     @id @default(uuid())
+  title          String
+  description    String?
+  status         TaskStatus @default(TODO)
+  priority       Priority   @default(MEDIUM)
+  estimatedHours Float?
+  actualHours    Float?
+  storyPoints    Int?
+  dueDate        DateTime?
+  startDate      DateTime?
+  completedAt    DateTime?
+  position       Int        @default(0)
+  labels         Json?      // string[]
+
+  projectId String
+  sprintId  String?
+  boardColumnId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint       Sprint?       @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  boardColumn  BoardColumn?  @relation(fields: [boardColumnId], references: [id], onDelete: SetNull)
+
+  assignments  TaskAssignment[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+  timeLogs     TimeLog[]
+  dependencies TaskDependency[] @relation("DependentTask")
+  dependents   TaskDependency[] @relation("DependencyTask")
+  subtasks     Subtask[]
+
+  @@index([projectId, status])
+  @@index([sprintId])
+  @@map("tasks")
+}
+
+model Subtask {
+  id          String  @id @default(uuid())
+  title       String
+  isCompleted Boolean @default(false)
+  position    Int     @default(0)
+
+  taskId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("subtasks")
+}
+
+model TaskAssignment {
+  id     String @id @default(uuid())
+  taskId String
+  userId String
+
+  assignedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
+
+model TaskComment {
+  id       String  @id @default(uuid())
+  content  String
+  taskId   String
+  userId   String
+  parentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task    Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies TaskComment[] @relation("CommentReplies")
+
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id         String @id @default(uuid())
+  fileName   String
+  fileUrl    String
+  fileType   String
+  fileSize   Int
+  taskId     String
+  uploadedBy String
+
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@map("task_attachments")
+}
+
+model TaskDependency {
+  id               String @id @default(uuid())
+  dependentTaskId  String
+  dependencyTaskId String
+
+  createdAt DateTime @default(now())
+
+  dependentTask  Task @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+  dependencyTask Task @relation("DependencyTask", fields: [dependencyTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, dependencyTaskId])
+  @@map("task_dependencies")
+}
+
+// ============================================
+// SPRINT MODELS
+// ============================================
+
+model Sprint {
+  id        String       @id @default(uuid())
+  name      String
+  goal      String?
+  status    SprintStatus @default(PLANNING)
+  startDate DateTime
+  endDate   DateTime
+  projectId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@map("sprints")
+}
+
+// ============================================
+// BOARD & VIEW MODELS (ClickUp/Monday-style)
+// ============================================
+
+model Board {
+  id        String @id @default(uuid())
+  name      String
+  projectId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  columns BoardColumn[]
+  groups  BoardGroup[]
+
+  @@map("boards")
+}
+
+model BoardColumn {
+  id         String  @id @default(uuid())
+  name       String
+  color      String  @default("#6C5CE7")
+  position   Int     @default(0)
+  taskStatus TaskStatus?
+  wipLimit   Int?    // Work-in-progress limit
+
+  boardId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@map("board_columns")
+}
+
+model SavedView {
+  id       String   @id @default(uuid())
+  name     String
+  type     ViewType @default(LIST)
+  filters  Json?    // { op: "AND", fields: [...] }
+  sorting  Json?    // { fields: [{ field, dir }] }
+  grouping Json?    // { field, dir }
+  columns  Json?    // visible columns config
+  isDefault Boolean @default(false)
+
+  projectId String?
+  userId    String // who created this view
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_views")
+}
+
+// ============================================
+// TIME TRACKING
+// ============================================
+
+model TimeLog {
+  id          String   @id @default(uuid())
+  hours       Float
+  description String?
+  logDate     DateTime
+  startTime   DateTime?
+  endTime     DateTime?
+  taskId      String
+  userId      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, logDate])
+  @@map("time_logs")
+}
+
+// ============================================
+// ACTIVITY & AUDIT LOGS
+// ============================================
+
+model ActivityLog {
+  id         String         @id @default(uuid())
+  action     ActivityAction
+  entityType EntityType
+  entityId   String
+  details    Json?
+  userId     String
+  projectId  String?
+  organizationId String?
+
+  createdAt DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id      String           @id @default(uuid())
+  type    NotificationType
+  title   String
+  message String
+  isRead  Boolean          @default(false)
+  userId  String
+  link    String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ============================================
+// CHAT & MESSAGING (Slack/Teams-style)
+// ============================================
+
+model ChatChannel {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  type        ChannelType @default(GENERAL)
+  isArchived  Boolean     @default(false)
+
+  organizationId String
+  projectId      String?  // linked project channel
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  members      ChannelMember[]
+  messages     ChannelMessage[]
+
+  @@map("chat_channels")
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  lastReadAt DateTime?
+
+  joinedAt DateTime @default(now())
+
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@map("channel_members")
+}
+
+model ChannelMessage {
+  id        String  @id @default(uuid())
+  content   String
+  channelId String
+  userId    String
+  mentions  Json?   // string[] of userIds
+  parentId  String? // thread replies
+
+  isEdited Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  ChannelMessage?  @relation("MessageReplies", fields: [parentId], references: [id])
+  replies ChannelMessage[] @relation("MessageReplies")
+
+  @@index([channelId, createdAt])
+  @@map("channel_messages")
+}
+
+// ============================================
+// DOCUMENTS (Notion-style)
+// ============================================
+
+model DocumentPage {
+  id          String  @id @default(uuid())
+  title       String
+  icon        String? // emoji or icon name
+  coverImage  String?
+  isPublished Boolean @default(false)
+
+  projectId   String?
+  createdById String
+  parentId    String? // for nested pages
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User          @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  parent   DocumentPage?  @relation("PageChildren", fields: [parentId], references: [id])
+  children DocumentPage[] @relation("PageChildren")
+  blocks   DocumentBlock[]
+
+  @@map("document_pages")
+}
+
+model DocumentBlock {
+  id       String       @id @default(uuid())
+  type     DocBlockType @default(PARAGRAPH)
+  content  Json         // { text, checked, language, url, etc. }
+  position Int          @default(0)
+
+  pageId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page DocumentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, position])
+  @@map("document_blocks")
+}
+
+// ============================================
+// AUTOMATION ENGINE (Monday.com-style)
+// ============================================
+
+model AutomationRule {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean             @default(true)
+  trigger     AutomationTrigger
+  triggerConfig Json?
+  conditions  Json?               // [{ field, operator, value }]
+  actions     Json?               // [{ type, config }]
+
+  projectId      String?
+  organizationId String
+
+  executionCount Int @default(0)
+  lastExecutedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   AutomationExecution[]
+
+  @@map("automation_rules")
+}
+
+model AutomationExecution {
+  id        String  @id @default(uuid())
+  ruleId    String
+  success   Boolean
+  input     Json?   // trigger data
+  output    Json?   // action results
+  error     String?
+  duration  Int?    // ms
+
+  executedAt DateTime @default(now())
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, executedAt])
+  @@map("automation_executions")
+}
+
+// ============================================
+// PERMISSIONS (Granular RBAC)
+// ============================================
+
+model Permission {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  category    String  // e.g. "projects", "tasks", "users", "analytics"
+
+  createdAt DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  role         Role
+  permissionId String
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// WORKSPACE (Top-level containers)
+// ============================================
+
+model Workspace {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  color       String  @default("#6C5CE7")
+  isArchived  Boolean @default(false)
+
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]    @relation("WorkspaceProjects")
+
+  @@map("workspaces")
+}
+
+// ============================================
+// TEAMS & TEAM MEMBERS
+// ============================================
+
+model Team {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  avatar      String?
+  color       String  @default("#16A34A")
+
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id     String @id @default(uuid())
+  teamId String
+  userId String
+  role   String @default("member") // member, lead
+
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+// ============================================
+// PROJECT STAKEHOLDERS
+// ============================================
+
+model Stakeholder {
+  id           String  @id @default(uuid())
+  name         String
+  email        String?
+  phone        String?
+  company      String?
+  role         String  // e.g. "Client", "Sponsor", "Advisor"
+  influence    String  @default("MEDIUM") // LOW, MEDIUM, HIGH
+  notes        String?
+
+  projectId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("stakeholders")
+}
+
+// ============================================
+// WEBHOOKS
+// ============================================
+
+enum WebhookEvent {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  TASK_COMPLETED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_COMPLETED
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  COMMENT_CREATED
+  USER_INVITED
+}
+
+model Webhook {
+  id          String  @id @default(uuid())
+  name        String
+  url         String
+  secret      String?
+  events      Json    // WebhookEvent[]
+  isActive    Boolean @default(true)
+  lastPingedAt DateTime?
+  lastStatus  Int?
+
+  organizationId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+// ============================================
+// DASHBOARDS & WIDGETS (Jira/monday-style)
+// ============================================
+
+model Dashboard {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  isDefault   Boolean @default(false)
+  layout      Json?   // grid layout config
+
+  organizationId String
+  createdById    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  widgets      DashboardWidget[]
+
+  @@map("dashboards")
+}
+
+model DashboardWidget {
+  id          String @id @default(uuid())
+  title       String
+  type        String // chart, kpi, table, list, etc.
+  config      Json?  // widget-specific configuration
+  position    Json?  // { x, y, w, h } grid position
+  dataSource  String? // analytics endpoint or query
+
+  dashboardId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dashboard Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@map("dashboard_widgets")
+}
+
+// ============================================
+// NOTIFICATION SETTINGS
+// ============================================
+
+model NotificationSetting {
+  id                   String  @id @default(uuid())
+  userId               String  @unique
+  emailNotifications   Boolean @default(true)
+  pushNotifications    Boolean @default(true)
+  taskAssigned         Boolean @default(true)
+  taskUpdated          Boolean @default(true)
+  taskCompleted        Boolean @default(true)
+  commentAdded         Boolean @default(true)
+  mentionNotification  Boolean @default(true)
+  sprintUpdates        Boolean @default(true)
+  projectUpdates       Boolean @default(true)
+  dailyDigest          Boolean @default(false)
+  weeklyReport         Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+// ============================================
+// BOARD GROUPS (Monday.com-style)
+// ============================================
+
+model BoardGroup {
+  id       String @id @default(uuid())
+  name     String
+  color    String @default("#636E72")
+  position Int    @default(0)
+  isCollapsed Boolean @default(false)
+
+  boardId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("board_groups")
+}
+
+// ============================================
+// PASSWORD RESET TOKENS
+// ============================================
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
